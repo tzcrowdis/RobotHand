@@ -12,22 +12,26 @@ public class Pincher : MonoBehaviour
     public XRDirectInteractor rHand;
     public XRDirectInteractor lHand;
 
-    bool grabbed;
-    bool grabbedLeft;
-
     public Transform leftPincher;
     public Transform rightPincher;
+
+    bool grabbed;
+    bool grabbedLeft;
 
     float maxRot = 20f;
     Vector3 closed = Vector3.zero;
     Vector3 rightOpen;
     Vector3 leftOpen;
+    Vector3 clamped = new Vector3(2.5f, 0f, 0f); //stop point when holding needle
 
     float rotationSpeed = 0.5f;
     Vector3 currentRotation = Vector3.zero;
 
     float clampThresh = 0.5f;
     float breakThresh = 0.8f;
+
+    GameObject needle;
+    bool needleInRange = false;
 
     void Start()
     {
@@ -67,6 +71,8 @@ public class Pincher : MonoBehaviour
             //when grabbed rotate pincher based on trigger value of grabbed hand
             if (grabbed)
                 MovePincher(grabbedLeft);
+
+            HoldNeedle();
         }
     }
 
@@ -123,7 +129,7 @@ public class Pincher : MonoBehaviour
         else if (triggerValue <= breakThresh)
         {
             //keep robot hand at closed position
-            if (leftPincher.localEulerAngles.x > 0 & leftPincher.localEulerAngles.x < maxRot)
+            if (leftPincher.localEulerAngles.x > closed.x & leftPincher.localEulerAngles.x < maxRot)
             {
                 leftPincher.Rotate(-rotationSpeed, 0f, 0f);
                 rightPincher.Rotate(rotationSpeed, 0f, 0f);
@@ -131,13 +137,13 @@ public class Pincher : MonoBehaviour
             else
             {
                 leftPincher.localEulerAngles = closed;
-                rightPincher.localEulerAngles = closed;
+                rightPincher.localEulerAngles = -closed;
             }
         }
         else
         {
             //if needle is held then it breaks under this pressure
-            if (leftPincher.localEulerAngles.x > 0 & leftPincher.localEulerAngles.x < maxRot)
+            if (leftPincher.localEulerAngles.x > closed.x & leftPincher.localEulerAngles.x < maxRot)
             {
                 leftPincher.Rotate(-rotationSpeed, 0f, 0f);
                 rightPincher.Rotate(rotationSpeed, 0f, 0f);
@@ -145,10 +151,18 @@ public class Pincher : MonoBehaviour
             else
             {
                 leftPincher.localEulerAngles = closed;
-                rightPincher.localEulerAngles = closed;
+                rightPincher.localEulerAngles = -closed;
 
                 //check if needle held here
-                Debug.Log("NEEDLE BROKEN!");
+                if (closed == clamped)
+                {
+                    if (needle != null)
+                    {
+                        Debug.Log("NEEDLE BROKEN!");
+                        needle.gameObject.GetComponent<Needle>().DestroyNeedle();
+                        needle = null;
+                    }
+                }
             }
         }
     }
@@ -158,5 +172,51 @@ public class Pincher : MonoBehaviour
     {
         leftController = InputDevices.GetDeviceAtXRNode(XRNode.LeftHand);
         rightController = InputDevices.GetDeviceAtXRNode(XRNode.RightHand);
+    }
+
+    //set needle object
+    private void OnTriggerEnter(Collider other)
+    {
+        if (other.gameObject.name == "Needle")
+        {
+            needleInRange = true;
+
+            closed = clamped;
+
+            if (needle == null)
+                needle = other.gameObject;
+        }
+    }
+
+    //handle holding needle
+    void HoldNeedle()
+    {
+        if (needleInRange & needle != null)
+        {
+            if (leftPincher.localEulerAngles == clamped)
+            {
+                if (!needle.gameObject.GetComponent<Needle>().locked)
+                    needle.gameObject.GetComponent<Needle>().LockMotion(gameObject);
+            }
+            else
+            {
+                if (needle.gameObject.GetComponent<Needle>().locked)
+                    needle.gameObject.GetComponent<Needle>().UnlockMotion();
+            }
+        }
+    }
+
+    //needle dropped
+    private void OnTriggerExit(Collider other)
+    {
+        if (other.gameObject.name == "Needle")
+        {
+            needleInRange = false;
+            
+            closed = Vector3.zero;
+
+            if (other.gameObject.GetComponent<Needle>().locked)
+                other.gameObject.GetComponent<Needle>().UnlockMotion();
+        }
     }
 }
