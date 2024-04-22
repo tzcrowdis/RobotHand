@@ -70,10 +70,6 @@ public class Pincher : MonoBehaviour
         }
     }
 
-    //trigger value = 0 -> pincher open
-    //0 < trigger value < 0.7 -> rotate percent
-    //trigger value >= 0.7 -> pincher closed
-    //trigger value >= 0.9 -> needle breaks
     void MovePincher(bool left)
     {
         //get trigger value 
